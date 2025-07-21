@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { signIn as amplifySignIn, signOut as amplifySignOut, getCurrentUser, fetchMFAPreference, setUpTOTP, verifyTOTPSetup, updateMFAPreference, confirmSignIn } from 'aws-amplify/auth';
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { ReactNode } from 'react';
+import { signIn as amplifySignIn, signOut as amplifySignOut, getCurrentUser, setUpTOTP, verifyTOTPSetup, updateMFAPreference, confirmSignIn } from 'aws-amplify/auth';
 import type { AuthContextType, User, MFAStatus } from '../types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,7 +43,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           email: currentUser.signInDetails?.loginId || '',
           mfaEnabled: currentUser.username === 'testuser1' // 一時的なハードコード
         });
-      } catch (error) {
+      } catch {
         setUser(null);
       }
     };
@@ -64,12 +66,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         localStorage.removeItem('mfaSetupCompleted');
       }
-    } catch (error) {
-      console.error('localStorage save error:', error);
+    } catch (error: unknown) {
+      console.error('localStorage save error:', error instanceof Error ? error.message : String(error));
     }
   }, []);
 
-  const calculateMFAStatus = (targetUser?: User | null): MFAStatus => {
+  const calculateMFAStatus = useCallback((targetUser?: User | null): MFAStatus => {
     const currentUser = targetUser || user;
 
     const deadline = new Date(import.meta.env.VITE_MFA_DEADLINE || '2025-09-01');
@@ -105,14 +107,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       warningLevel,
       showWarning: showWarning && !isMfaEnabled
     };
-  };
+  }, [mfaSetupCompleted, user]);
 
   useEffect(() => {
     if (user) {
       const newStatus = calculateMFAStatus();
       setMFAStatus(newStatus);
     }
-  }, [user?.mfaEnabled, mfaSetupCompleted]);
+  }, [user, mfaSetupCompleted, calculateMFAStatus]);
 
   const signIn = async (username: string, password: string) => {
     try {
@@ -135,9 +137,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         throw new Error('予期しないサインイン状態です。');
       }
-    } catch (error) {
-      console.error('AuthContext signIn - Error:', error);
-      throw error;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(errorMessage);
     }
   };
 
@@ -159,9 +161,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         throw new Error('MFA確認が完了しませんでした。');
       }
-    } catch (error) {
-      console.error('AuthContext confirmMFA - Error:', error);
-      throw error;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(errorMessage);
     }
   };
 
@@ -175,12 +177,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // localStorage もクリア
       try {
         localStorage.removeItem('mfaSetupCompleted');
-      } catch (storageError) {
-        console.error('localStorage clear error:', storageError);
+      } catch (storageError: unknown) {
+        console.error('localStorage clear error:', storageError instanceof Error ? storageError.message : String(storageError));
       }
-    } catch (error) {
-      console.error('Sign out error:', error);
-      throw error;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(errorMessage);
     }
   };
 
@@ -231,14 +233,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // SMS MFA setup would be implemented here
         throw new Error('SMS MFA setup not yet implemented');
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorInstance = error instanceof Error ? error : new Error(String(error));
       console.error('MFA setup error details:', {
-        errorName: error.name,
-        errorMessage: error.message,
-        errorCode: error.code,
+        errorName: errorInstance.name,
+        errorMessage: errorInstance.message,
         user: user?.username
       });
-      throw error;
+      throw errorInstance;
     }
   };
 
@@ -252,8 +254,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await updateMFAPreference({ 
           totp: 'PREFERRED'
         });
-      } catch (preferenceError) {
-        console.error('MFA preference update error:', preferenceError);
+      } catch (preferenceError: unknown) {
+        const errorMessage = preferenceError instanceof Error ? preferenceError.message : String(preferenceError);
+        console.error('MFA preference update error:', errorMessage);
         
         // 代替的なアプローチを試す
         await updateMFAPreference({ 
@@ -275,14 +278,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       return { success: true };
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorInstance = error instanceof Error ? error : new Error(String(error));
       console.error('TOTP verification and enablement error:', {
-        name: error.name,
-        message: error.message,
-        code: error.code,
-        step: error.message.includes('verifyTOTPSetup') ? 'verification' : 'preference_update'
+        name: errorInstance.name,
+        message: errorInstance.message,
+        step: errorInstance.message.includes('verifyTOTPSetup') ? 'verification' : 'preference_update'
       });
-      throw error;
+      throw errorInstance;
     }
   };
 

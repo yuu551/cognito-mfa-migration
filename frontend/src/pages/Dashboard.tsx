@@ -9,26 +9,12 @@ import ProgressBar from '@cloudscape-design/components/progress-bar';
 import Button from '@cloudscape-design/components/button';
 import Alert from '@cloudscape-design/components/alert';
 import { useAuth } from '../contexts/AuthContext';
-import type { User } from '../types/auth';
 import MFAWarningModal from '../components/MFAWarningModal';
 
-interface DashboardProps {
-  user: User;
-}
-
-const Dashboard: React.FC<DashboardProps> = ({ user: propsUser }) => {
-  const { user, mfaStatus, mfaSetupCompleted, signOut, checkMFAStatus, initializeUser } = useAuth(); // 🚀 mfaSetupCompletedを追加
+const Dashboard: React.FC = () => {
+  const { user, mfaStatus, mfaSetupCompleted, signOut } = useAuth();
   const [showMFAWarning, setShowMFAWarning] = useState(false);
 
-  // propsUserとAuthContextのユーザーを同期（初回のみ）
-  useEffect(() => {
-    if (propsUser && !user) {
-      const updatedUser = propsUser.username === 'testuser1' 
-        ? { ...propsUser, mfaEnabled: true }
-        : propsUser;
-      initializeUser(updatedUser);
-    }
-  }, [propsUser?.username]);
 
   useEffect(() => {
     // ログイン直後にMFA警告を表示
@@ -40,8 +26,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user: propsUser }) => {
   const handleSignOut = async () => {
     try {
       await signOut();
-    } catch (error) {
-      console.error('Sign out error:', error);
+    } catch (error: unknown) {
+      console.error('Sign out error:', error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -182,7 +168,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: propsUser }) => {
               <SpaceBetween direction="vertical" size="m">
                 <ProgressBar
                   value={getMFAProgress()}
-                  variant={(mfaSetupCompleted || user?.mfaEnabled) ? "success" : mfaStatus?.warningLevel === "error" ? "error" : "info"}
+                  resultText={(mfaSetupCompleted || user?.mfaEnabled) ? "完了" : mfaStatus?.warningLevel === "error" ? "エラー" : "進行中"}
                   description={
                     (mfaSetupCompleted || user?.mfaEnabled) 
                       ? "MFA設定完了" 

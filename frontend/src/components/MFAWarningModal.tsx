@@ -20,7 +20,7 @@ const MFAWarningModal: React.FC<MFAWarningModalProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  const getWarningTitle = (daysRemaining: number, warningLevel: string) => {
+  const getWarningTitle = (daysRemaining: number) => {
     if (daysRemaining > 30) {
       return 'セキュリティ強化のお知らせ';
     } else if (daysRemaining > 7) {
@@ -75,7 +75,7 @@ const MFAWarningModal: React.FC<MFAWarningModalProps> = ({
     <Modal
       visible={visible}
       onDismiss={onDismiss}
-      header={getWarningTitle(mfaStatus.daysRemaining, mfaStatus.warningLevel)}
+      header={getWarningTitle(mfaStatus.daysRemaining)}
       footer={
         <Box float="right">
           <SpaceBetween direction="horizontal" size="xs">

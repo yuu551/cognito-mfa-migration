@@ -9,17 +9,13 @@ import Alert from '@cloudscape-design/components/alert';
 import Box from '@cloudscape-design/components/box';
 import { useAuth } from '../contexts/AuthContext';
 
-interface LoginProps {
-  onSignIn: () => void;
-}
-
-const Login: React.FC<LoginProps> = ({ onSignIn }) => {
+const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { signIn, confirmMFA, needsMFAConfirmation, user } = useAuth();
+  const { signIn, confirmMFA, needsMFAConfirmation } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,20 +24,16 @@ const Login: React.FC<LoginProps> = ({ onSignIn }) => {
 
     try {
       if (needsMFAConfirmation) {
-        console.log('Confirming MFA with TOTP code');
         await confirmMFA(totpCode);
-        console.log('MFA confirmation successful');
       } else {
-        console.log('Attempting login with:', username);
         await signIn(username, password);
-        console.log('Login process completed');
       }
-    } catch (error: any) {
-      console.error('Login error:', error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       
       // Pre-authentication Lambda のエラーメッセージを表示
-      if (error.message && error.message.includes('MFA')) {
-        setError(error.message);
+      if (errorMessage.includes('MFA')) {
+        setError(errorMessage);
       } else {
         setError('ログインに失敗しました。ユーザー名とパスワードを確認してください。');
       }
@@ -115,7 +107,6 @@ const Login: React.FC<LoginProps> = ({ onSignIn }) => {
                       value={totpCode}
                       onChange={({ detail }) => setTotpCode(detail.value)}
                       placeholder="123456"
-                      maxLength={6}
                       disabled={loading}
                     />
                   </FormField>
@@ -125,7 +116,6 @@ const Login: React.FC<LoginProps> = ({ onSignIn }) => {
               <Button 
                 variant="primary" 
                 loading={loading}
-                onClick={handleSubmit}
                 disabled={needsMFAConfirmation ? !totpCode || totpCode.length !== 6 : !username || !password}
                 fullWidth
               >

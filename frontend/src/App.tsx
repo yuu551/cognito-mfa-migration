@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { getCurrentUser } from 'aws-amplify/auth';
 import AppLayout from '@cloudscape-design/components/app-layout';
 import TopNavigation from '@cloudscape-design/components/top-navigation';
 import SideNavigation from '@cloudscape-design/components/side-navigation';
@@ -8,16 +7,11 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import MFASetup from './pages/MFASetup';
-import type { User } from './types/auth';
 
 function AppContent() {
   const { user } = useAuth();
   const [navigationOpen, setNavigationOpen] = useState(false);
 
-  // ユーザー状態変化をログ出力
-  useEffect(() => {
-    console.log('AppContent - User state changed:', user);
-  }, [user]);
 
   const topNavigationProps = {
     identity: {
@@ -29,7 +23,7 @@ function AppContent() {
         type: 'menu-dropdown' as const,
         text: user.username,
         description: user.email,
-        iconName: 'user-profile',
+        iconName: 'user-profile' as const,
         items: [
           {
             id: 'signout',
@@ -61,7 +55,7 @@ function AppContent() {
           }}
           utilities={[]}
         />
-        <Login onSignIn={() => {}} />
+        <Login />
       </>
     );
   }
@@ -75,8 +69,8 @@ function AppContent() {
         onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
         content={
           <Routes>
-            <Route path="/" element={<Dashboard user={user} />} />
-            <Route path="/mfa-setup" element={<MFASetup user={user} />} />
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/mfa-setup" element={<MFASetup />} />
           </Routes>
         }
       />

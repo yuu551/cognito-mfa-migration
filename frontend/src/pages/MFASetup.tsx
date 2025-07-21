@@ -12,31 +12,49 @@ import Button from '@cloudscape-design/components/button';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import QRCode from 'qrcode';
 import { useAuth } from '../contexts/AuthContext';
-import type { User } from '../types/auth';
 
-interface MFASetupProps {
-  user: User;
-}
-
-const MFASetup: React.FC<MFASetupProps> = ({ user }) => {
-  const { setupMFA, checkMFAStatus, verifyAndEnableMFA, setMfaSetupCompleted } = useAuth(); // 🚀 setMfaSetupCompletedを追加
+const MFASetup: React.FC = () => {
+  const { user, setupMFA, verifyAndEnableMFA, setMfaSetupCompleted } = useAuth();
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [mfaMethod, setMfaMethod] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [totpSecret, setTotpSecret] = useState('');
-  const [setupComplete, setSetupComplete] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  const i18nStrings = useMemo(() => {
+    const getSubmitButtonText = () => {
+      if (activeStepIndex === 3) return "完了";
+      if (activeStepIndex === 0 && !mfaMethod) return "認証方式を選択";
+      if (activeStepIndex === 1 && !phoneNumber) return "電話番号を入力";
+      if (activeStepIndex === 2 && (!verificationCode || verificationCode.length !== 6)) return "認証コードを入力";
+      return "次へ";
+    };
+
+    return {
+      submitButton: getSubmitButtonText(),
+      cancelButton: "キャンセル", 
+      nextButton: "次へ",
+      previousButton: "戻る",
+      stepNumberLabel: (stepNumber: number) => `ステップ ${stepNumber}`,
+      collapsedStepsLabel: (stepNumber: number, stepsCount: number) => 
+        `ステップ ${stepNumber} / ${stepsCount}`,
+      navigationAriaLabel: "MFA設定ウィザードナビゲーション",
+      optional: "任意"
+    };
+  }, [activeStepIndex, mfaMethod, phoneNumber, verificationCode]);
+
+  if (!user) return null;
 
   const generateQRCode = async (secret: string, username: string) => {
     const otpauthUrl = `otpauth://totp/MFA%20Migration%20System:${username}?secret=${secret}&issuer=MFA%20Migration%20System`;
     try {
       const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
       setQrCodeUrl(qrCodeDataUrl);
-    } catch (error) {
-      console.error('QR Code generation error:', error);
+    } catch (error: unknown) {
+      console.error('QR Code generation error:', error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -48,9 +66,10 @@ const MFASetup: React.FC<MFASetupProps> = ({ user }) => {
         const totpSetupDetails = await setupMFA('TOTP');
         
         // AWS Amplifyの戻り値の構造を確認
-        const setupUri = totpSetupDetails.getSetupUri ? 
-          totpSetupDetails.getSetupUri('MFA Migration System', user.username) : 
-          totpSetupDetails.setupUri;
+        const setupDetails = totpSetupDetails as Record<string, unknown>;
+        const setupUri = setupDetails.getSetupUri && typeof setupDetails.getSetupUri === 'function' ?
+          setupDetails.getSetupUri('MFA Migration System', user.username) :
+          setupDetails.setupUri;
         
         if (typeof setupUri === 'string') {
           const secretMatch = setupUri.match(/secret=([A-Z2-7]+)/);
@@ -58,28 +77,27 @@ const MFASetup: React.FC<MFASetupProps> = ({ user }) => {
           setTotpSecret(secret);
           await generateQRCode(secret, user.username);
         } else {
-          const secret = totpSetupDetails.secret || totpSetupDetails.sharedSecret || '';
+          const secret = String(setupDetails.secret || setupDetails.sharedSecret || '');
           setTotpSecret(secret);
           await generateQRCode(secret, user.username);
         }
         
         setActiveStepIndex(2); // Skip phone number step for TOTP
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorInstance = error instanceof Error ? error : new Error(String(error));
         console.error('TOTP setup detailed error:', {
-          name: error.name,
-          message: error.message,
-          code: error.code,
-          stack: error.stack
+          name: errorInstance.name,
+          message: errorInstance.message
         });
         
-        if (error.name === 'NotAuthorizedException') {
+        if (errorInstance.name === 'NotAuthorizedException') {
           setError('認証エラー: MFA設定の権限がありません。再ログインしてください。');
-        } else if (error.name === 'InvalidParameterException') {
+        } else if (errorInstance.name === 'InvalidParameterException') {
           setError('設定エラー: MFA設定に必要なパラメータが不足しています。');
-        } else if (error.message.includes('No mfa settings given')) {
+        } else if (errorInstance.message.includes('No mfa settings given')) {
           setError('MFA設定エラー: User PoolでMFAが有効になっていない可能性があります。管理者にお問い合わせください。');
         } else {
-          setError('TOTP設定の準備中にエラーが発生しました: ' + error.message);
+          setError('TOTP設定の準備中にエラーが発生しました: ' + errorInstance.message);
         }
       } finally {
         setLoading(false);
@@ -109,17 +127,17 @@ const MFASetup: React.FC<MFASetupProps> = ({ user }) => {
       // MFA設定完了フラグを直接立てる
       setMfaSetupCompleted(true);
       
-      setSetupComplete(true);
       setActiveStepIndex(3); // Go to completion step
-    } catch (error: any) {
-      console.error('TOTP verification error:', error);
+    } catch (error: unknown) {
+      const errorInstance = error instanceof Error ? error : new Error(String(error));
+      console.error('TOTP verification error:', errorInstance);
       
-      if (error.name === 'CodeMismatchException') {
+      if (errorInstance.name === 'CodeMismatchException') {
         setError('認証コードが正しくありません。認証アプリから最新のコードを入力してください。');
-      } else if (error.name === 'LimitExceededException') {
+      } else if (errorInstance.name === 'LimitExceededException') {
         setError('試行回数が上限に達しました。しばらく待ってから再試行してください。');
       } else {
-        setError('認証コードの検証中にエラーが発生しました: ' + error.message);
+        setError('認証コードの検証中にエラーが発生しました: ' + errorInstance.message);
       }
     } finally {
       setLoading(false);
@@ -223,7 +241,7 @@ const MFASetup: React.FC<MFASetupProps> = ({ user }) => {
               <Box>
                 アプリで手動入力を選択し、以下のシークレットキーを入力してください:
               </Box>
-              <Box fontFamily="monospace" fontSize="body-s">
+              <Box fontSize="body-s">
                 {totpSecret}
               </Box>
             </SpaceBetween>
@@ -238,7 +256,6 @@ const MFASetup: React.FC<MFASetupProps> = ({ user }) => {
               value={verificationCode}
               onChange={({ detail }) => setVerificationCode(detail.value)}
               placeholder="123456"
-              maxLength={6}
               disabled={loading}
             />
           </FormField>
@@ -284,7 +301,7 @@ const MFASetup: React.FC<MFASetupProps> = ({ user }) => {
     }
   ];
 
-  const handleNavigate = (detail: any) => {
+  const handleNavigate = (detail: { requestedStepIndex: number }) => {
     if (detail.requestedStepIndex > activeStepIndex) {
       // Forward navigation
       if (activeStepIndex === 0 && mfaMethod) {
@@ -301,27 +318,6 @@ const MFASetup: React.FC<MFASetupProps> = ({ user }) => {
   };
 
 
-  const i18nStrings = useMemo(() => {
-    const getSubmitButtonText = () => {
-      if (activeStepIndex === steps.length - 1) return "完了";
-      if (activeStepIndex === 0 && !mfaMethod) return "認証方式を選択";
-      if (activeStepIndex === 1 && !phoneNumber) return "電話番号を入力";
-      if (activeStepIndex === 2 && (!verificationCode || verificationCode.length !== 6)) return "認証コードを入力";
-      return "次へ";
-    };
-
-    return {
-      submitButton: getSubmitButtonText(),
-      cancelButton: "キャンセル", 
-      nextButton: "次へ",
-      previousButton: "戻る",
-      stepNumberLabel: (stepNumber: number) => `ステップ ${stepNumber}`,
-      collapsedStepsLabel: (stepNumber: number, stepsCount: number) => 
-        `ステップ ${stepNumber} / ${stepsCount}`,
-      navigationAriaLabel: "MFA設定ウィザードナビゲーション",
-      optional: "任意"
-    };
-  }, [activeStepIndex, mfaMethod, phoneNumber, verificationCode]);
 
   return (
     <Container
