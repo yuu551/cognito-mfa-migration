@@ -20,13 +20,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [mfaStatus, setMFAStatus] = useState<MFAStatus | null>(null);
   const [needsMFAConfirmation, setNeedsMFAConfirmation] = useState(false);
+  // 🚀 MFA設定完了フラグ - localStorageから初期値を読み込み
+  const [mfaSetupCompleted, setMfaSetupCompleted] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mfaSetupCompleted');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   // 初期化時の認証状態確認
   useEffect(() => {
     const checkInitialAuth = async () => {
       try {
         const currentUser = await getCurrentUser();
-        console.log('AuthContext - Initial auth check success:', currentUser.username);
         setUser({
           userId: currentUser.userId,
           username: currentUser.username,
@@ -34,7 +42,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           mfaEnabled: currentUser.username === 'testuser1' // 一時的なハードコード
         });
       } catch (error) {
-        console.log('AuthContext - No initial authenticated user');
         setUser(null);
       }
     };
@@ -46,7 +53,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(userData);
   }, []);
 
-  const calculateMFAStatus = (): MFAStatus => {
+  // 🚀 MFA設定完了フラグを外部から操作する関数 - localStorage永続化対応
+  const setMfaSetupCompletedFlag = useCallback((completed: boolean) => {
+    setMfaSetupCompleted(completed);
+    
+    // localStorage に永続化
+    try {
+      if (completed) {
+        localStorage.setItem('mfaSetupCompleted', 'true');
+      } else {
+        localStorage.removeItem('mfaSetupCompleted');
+      }
+    } catch (error) {
+      console.error('localStorage save error:', error);
+    }
+  }, []);
+
+  const calculateMFAStatus = (targetUser?: User | null): MFAStatus => {
+    const currentUser = targetUser || user;
+
     const deadline = new Date(import.meta.env.VITE_MFA_DEADLINE || '2025-09-01');
     const currentDate = new Date();
     const daysRemaining = Math.ceil((deadline.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -69,31 +94,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       showWarning = true;
     }
 
+    // 🚀 MFA設定完了フラグまたはユーザーのmfaEnabledをチェック
+    const isMfaEnabled = mfaSetupCompleted || currentUser?.mfaEnabled || false;
+
     return {
-      enabled: user?.mfaEnabled || false,
-      methods: user?.mfaEnabled ? ['TOTP'] : [],
+      enabled: isMfaEnabled,
+      methods: isMfaEnabled ? ['TOTP'] : [],
       migrationDeadline: deadline,
       daysRemaining,
       warningLevel,
-      showWarning: showWarning && !user?.mfaEnabled
+      showWarning: showWarning && !isMfaEnabled
     };
   };
 
   useEffect(() => {
     if (user) {
-      setMFAStatus(calculateMFAStatus());
+      const newStatus = calculateMFAStatus();
+      setMFAStatus(newStatus);
     }
-  }, [user]);
+  }, [user?.mfaEnabled, mfaSetupCompleted]);
 
   const signIn = async (username: string, password: string) => {
     try {
-      console.log('AuthContext signIn - Starting login process');
       const signInResult = await amplifySignIn({ username, password });
-      console.log('AuthContext signIn - SignIn result:', signInResult);
       
       if (signInResult.isSignedIn) {
         const currentUser = await getCurrentUser();
-        console.log('AuthContext signIn - Got current user:', currentUser.username);
         
         const newUser: User = {
           userId: currentUser.userId,
@@ -101,16 +127,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           email: currentUser.signInDetails?.loginId || '',
           mfaEnabled: currentUser.username === 'testuser1' // 一時的なハードコード
         };
-        console.log('AuthContext signIn - Setting user:', newUser);
         setUser(newUser);
         setNeedsMFAConfirmation(false);
-        console.log('AuthContext signIn - User set successfully');
       } else if (signInResult.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_TOTP_CODE') {
-        console.log('AuthContext signIn - MFA confirmation required');
         setNeedsMFAConfirmation(true);
         // MFA確認が必要な場合はエラーを投げずに状態変更のみ
       } else {
-        console.warn('AuthContext signIn - Unexpected signIn state:', signInResult);
         throw new Error('予期しないサインイン状態です。');
       }
     } catch (error) {
@@ -121,13 +143,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const confirmMFA = async (totpCode: string) => {
     try {
-      console.log('AuthContext confirmMFA - Confirming with TOTP code');
       const confirmResult = await confirmSignIn({ challengeResponse: totpCode });
-      console.log('AuthContext confirmMFA - Confirm result:', confirmResult);
       
       if (confirmResult.isSignedIn) {
         const currentUser = await getCurrentUser();
-        console.log('AuthContext confirmMFA - Got current user:', currentUser.username);
         
         const newUser: User = {
           userId: currentUser.userId,
@@ -135,12 +154,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           email: currentUser.signInDetails?.loginId || '',
           mfaEnabled: true
         };
-        console.log('AuthContext confirmMFA - Setting user:', newUser);
         setUser(newUser);
         setNeedsMFAConfirmation(false);
-        console.log('AuthContext confirmMFA - MFA confirmation successful');
       } else {
-        console.warn('AuthContext confirmMFA - User not signed in after MFA confirmation');
         throw new Error('MFA確認が完了しませんでした。');
       }
     } catch (error) {
@@ -154,6 +170,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await amplifySignOut();
       setUser(null);
       setMFAStatus(null);
+      setMfaSetupCompleted(false); // 🚀 設定完了フラグもリセット
+      
+      // localStorage もクリア
+      try {
+        localStorage.removeItem('mfaSetupCompleted');
+      } catch (storageError) {
+        console.error('localStorage clear error:', storageError);
+      }
     } catch (error) {
       console.error('Sign out error:', error);
       throw error;
@@ -162,7 +186,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkMFAStatus = async () => {
     // 一時的にAPI呼び出しを無効化（レート制限とループ防止）
-    console.log('checkMFAStatus called - API disabled to prevent rate limiting');
     return;
     
     /* 元のコード - レート制限解除後に復元
@@ -199,12 +222,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const setupMFA = async (method: 'SMS' | 'TOTP') => {
     try {
       if (method === 'TOTP') {
-        console.log('Setting up TOTP for user:', user?.username);
         
         // AWS Amplify v6の正しいsetUpTOTP呼び出し
         const totpSetupDetails = await setUpTOTP();
         
-        console.log('TOTP setup successful:', totpSetupDetails);
         return totpSetupDetails;
       } else {
         // SMS MFA setup would be implemented here
@@ -223,35 +244,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const verifyAndEnableMFA = async (totpCode: string) => {
     try {
-      console.log('Step 1: Verifying TOTP setup with code');
-      
       // TOTP設定を検証
       await verifyTOTPSetup({ code: totpCode });
-      console.log('Step 1 completed: TOTP verification successful');
-      
-      console.log('Step 2: Enabling MFA preference');
       
       try {
         // MFAを有効化 - AWS Amplify v6の正しい形式
         await updateMFAPreference({ 
           totp: 'PREFERRED'
         });
-        console.log('Step 2 completed: MFA preference updated');
       } catch (preferenceError) {
-        console.error('Step 2 failed: MFA preference update error:', preferenceError);
+        console.error('MFA preference update error:', preferenceError);
         
         // 代替的なアプローチを試す
-        console.log('Trying alternative approach: TOTP enabled');
         await updateMFAPreference({ 
           totp: 'ENABLED'
         });
-        console.log('Step 2 completed: Alternative MFA preference updated');
       }
 
-      // MFA状態を更新
-      console.log('Step 3: Checking updated MFA status');
-      await checkMFAStatus();
-      console.log('Step 3 completed: MFA status updated');
+      // MFA状態を即座にローカル更新
+      if (user) {
+        const updatedUser = { ...user, mfaEnabled: true };
+        setUser(updatedUser);
+        
+        // MFA設定完了フラグを立てる
+        setMfaSetupCompleted(true);
+
+        // MFA状態も即座に更新
+        const newMFAStatus = calculateMFAStatus(updatedUser);
+        setMFAStatus(newMFAStatus);
+      }
       
       return { success: true };
     } catch (error) {
@@ -269,13 +290,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     mfaStatus,
     needsMFAConfirmation,
+    mfaSetupCompleted, // 🚀 MFA設定完了フラグを追加
     signIn,
     signOut,
     checkMFAStatus,
     setupMFA,
     verifyAndEnableMFA,
     confirmMFA,
-    initializeUser
+    initializeUser,
+    setMfaSetupCompleted: setMfaSetupCompletedFlag // 🚀 フラグ操作関数を追加
   };
 
   return (

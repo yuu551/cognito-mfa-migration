@@ -17,19 +17,18 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user: propsUser }) => {
-  const { user, mfaStatus, signOut, checkMFAStatus, initializeUser } = useAuth();
+  const { user, mfaStatus, mfaSetupCompleted, signOut, checkMFAStatus, initializeUser } = useAuth(); // 🚀 mfaSetupCompletedを追加
   const [showMFAWarning, setShowMFAWarning] = useState(false);
 
   // propsUserとAuthContextのユーザーを同期（初回のみ）
   useEffect(() => {
     if (propsUser && !user) {
-      console.log('Dashboard - Initializing user from props:', propsUser.username);
       const updatedUser = propsUser.username === 'testuser1' 
         ? { ...propsUser, mfaEnabled: true }
         : propsUser;
       initializeUser(updatedUser);
     }
-  }, [propsUser, user]); // userも依存配列に追加して、一度だけ実行
+  }, [propsUser?.username]);
 
   useEffect(() => {
     // ログイン直後にMFA警告を表示
@@ -47,7 +46,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user: propsUser }) => {
   };
 
   const getMFAStatusIndicator = () => {
-    if (user?.mfaEnabled) {
+    // 🚀 Option B: 設定完了フラグまたはユーザーのmfaEnabledをチェック
+    if (mfaSetupCompleted || user?.mfaEnabled) {
       return <StatusIndicator type="success">有効</StatusIndicator>;
     } else {
       return <StatusIndicator type="error">未設定</StatusIndicator>;
@@ -55,13 +55,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user: propsUser }) => {
   };
 
   const getMFAProgress = () => {
-    if (user?.mfaEnabled) {
-      return 100;
-    } else if (mfaStatus && mfaStatus.daysRemaining <= 0) {
-      return 0; // 期限切れ
-    } else {
-      return Math.max(0, Math.min(100, 100 - ((mfaStatus?.daysRemaining || 0) * 2)));
-    }
+    // MFA設定完了フラグまたはユーザーのmfaEnabledがtrueなら100%
+    const progress = (mfaSetupCompleted || user?.mfaEnabled) ? 100 : (
+      mfaStatus && mfaStatus.daysRemaining <= 0 ? 0 : 
+      Math.max(0, Math.min(100, 100 - ((mfaStatus?.daysRemaining || 0) * 2)))
+    );
+
+    return progress;
   };
 
   const dashboardCards = [
@@ -124,7 +124,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: propsUser }) => {
             <Box variant="awsui-key-label">パスワード認証</Box>
             <StatusIndicator type="success">有効</StatusIndicator>
           </Box>
-          {!user?.mfaEnabled && (
+          {!(mfaSetupCompleted || user?.mfaEnabled) && (
             <Button variant="primary" href="/mfa-setup">
               MFA設定を開始
             </Button>
@@ -160,7 +160,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: propsUser }) => {
               </Box>
             </Box>
 
-            {!user?.mfaEnabled && mfaStatus && (
+            {!(mfaSetupCompleted || user?.mfaEnabled) && mfaStatus && (
               <Alert
                 type={mfaStatus.warningLevel}
                 header="多要素認証の設定が必要です"
@@ -182,9 +182,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user: propsUser }) => {
               <SpaceBetween direction="vertical" size="m">
                 <ProgressBar
                   value={getMFAProgress()}
-                  variant={user?.mfaEnabled ? "success" : mfaStatus?.warningLevel === "error" ? "error" : "info"}
+                  variant={(mfaSetupCompleted || user?.mfaEnabled) ? "success" : mfaStatus?.warningLevel === "error" ? "error" : "info"}
                   description={
-                    user?.mfaEnabled 
+                    (mfaSetupCompleted || user?.mfaEnabled) 
                       ? "MFA設定完了" 
                       : `MFA設定進捗 (期限: ${mfaStatus?.migrationDeadline.toLocaleDateString('ja-JP')})`
                   }

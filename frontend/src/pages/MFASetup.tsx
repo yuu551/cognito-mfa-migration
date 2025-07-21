@@ -19,7 +19,7 @@ interface MFASetupProps {
 }
 
 const MFASetup: React.FC<MFASetupProps> = ({ user }) => {
-  const { setupMFA, checkMFAStatus, verifyAndEnableMFA } = useAuth();
+  const { setupMFA, checkMFAStatus, verifyAndEnableMFA, setMfaSetupCompleted } = useAuth(); // 🚀 setMfaSetupCompletedを追加
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [mfaMethod, setMfaMethod] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -45,35 +45,20 @@ const MFASetup: React.FC<MFASetupProps> = ({ user }) => {
       setLoading(true);
       setError('');
       try {
-        console.log('Starting TOTP setup for user:', user.username);
-        console.log('User state:', user);
-        
         const totpSetupDetails = await setupMFA('TOTP');
-        console.log('TOTP Setup Details:', totpSetupDetails);
-        console.log('Setup Details Structure:', {
-          hasGetSetupUri: typeof totpSetupDetails.getSetupUri === 'function',
-          hasSetupUri: !!totpSetupDetails.setupUri,
-          hasSecret: !!totpSetupDetails.secret,
-          hasSharedSecret: !!totpSetupDetails.sharedSecret,
-          allKeys: Object.keys(totpSetupDetails)
-        });
         
         // AWS Amplifyの戻り値の構造を確認
         const setupUri = totpSetupDetails.getSetupUri ? 
           totpSetupDetails.getSetupUri('MFA Migration System', user.username) : 
           totpSetupDetails.setupUri;
-        console.log('Setup URI:', setupUri);
         
         if (typeof setupUri === 'string') {
           const secretMatch = setupUri.match(/secret=([A-Z2-7]+)/);
           const secret = secretMatch ? secretMatch[1] : '';
-          console.log('Extracted secret from URI:', secret ? 'Found' : 'Not found');
           setTotpSecret(secret);
           await generateQRCode(secret, user.username);
         } else {
-          // 別の構造の場合
           const secret = totpSetupDetails.secret || totpSetupDetails.sharedSecret || '';
-          console.log('Alternative secret extraction:', secret ? 'Found' : 'Not found');
           setTotpSecret(secret);
           await generateQRCode(secret, user.username);
         }
@@ -121,8 +106,10 @@ const MFASetup: React.FC<MFASetupProps> = ({ user }) => {
       // AWS CognitoでTOTPコードを検証してMFAを有効化
       await verifyAndEnableMFA(verificationCode);
       
+      // MFA設定完了フラグを直接立てる
+      setMfaSetupCompleted(true);
+      
       setSetupComplete(true);
-      await checkMFAStatus();
       setActiveStepIndex(3); // Go to completion step
     } catch (error: any) {
       console.error('TOTP verification error:', error);

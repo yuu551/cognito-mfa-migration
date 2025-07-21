@@ -18,6 +18,7 @@ export interface AuthContextType {
   user: User | null;
   mfaStatus: MFAStatus | null;
   needsMFAConfirmation: boolean;
+  mfaSetupCompleted: boolean; // 🚀 MFA設定完了フラグ
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   checkMFAStatus: () => Promise<void>;
@@ -25,4 +26,5 @@ export interface AuthContextType {
   verifyAndEnableMFA: (totpCode: string) => Promise<{ success: boolean }>;
   confirmMFA: (totpCode: string) => Promise<void>;
   initializeUser: (userData: User) => void;
+  setMfaSetupCompleted: (completed: boolean) => void; // 🚀 フラグ操作関数を追加
 }
