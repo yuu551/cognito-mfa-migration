@@ -74,6 +74,12 @@
    - Lambda事前認証トリガー
    - 期限後猶予期間管理
    - 自動ログインブロック
+   - MFA確認時のユーザー名変更制限
+
+6. **状態永続化機能**
+   - localStorageによるMFA設定完了状態の保持
+   - ページ遷移やリロード時の状態維持
+   - サインアウト時の適切なクリーンアップ
 
 ## 📁 プロジェクト構成
 
@@ -193,6 +199,7 @@ aws cognito-idp admin-set-user-password \
 - AWS Amplify v6 API形式: `totp: 'PREFERRED'`が正解
 - 無限ループ防止: useEffect依存配列の最適化
 - 状態管理一元化: App.tsxとの重複排除
+- MFA設定完了状態のlocalStorage永続化実装
 
 ### Dashboard (`frontend/src/pages/Dashboard.tsx`)
 
@@ -275,6 +282,8 @@ if (currentDate > migrationDeadline) {
 2. **TOTP実装**: RFC 6238準拠
 3. **期限管理**: サーバーサイド検証
 4. **エラーハンドリング**: 情報漏洩防止
+5. **MFA確認時の身元制限**: ユーザー名変更禁止
+6. **状態永続化**: localStorageを用いたUI状態の安全な保存
 
 ### 推奨追加対策
 
@@ -284,6 +293,56 @@ if (currentDate > migrationDeadline) {
 4. **監視**: CloudWatch設定
 
 ## 🐛 解決済み技術課題
+
+### 0. MFA設定完了状態のリセット問題 (2025年1月解決)
+
+**問題**: MFA設定完了後にダッシュボードに遷移すると進捗バーが16%にリセットされる
+
+**原因**: React コンポーネントのライフサイクルにより、ページ遷移時に状態が初期化される
+
+**解決**:
+```typescript
+// localStorageによる状態永続化
+const [mfaSetupCompleted, setMfaSetupCompleted] = useState(() => {
+  try {
+    const saved = localStorage.getItem('mfaSetupCompleted');
+    return saved === 'true';
+  } catch {
+    return false;
+  }
+});
+
+// 状態変更時のlocalStorage保存
+const setMfaSetupCompletedFlag = (completed: boolean) => {
+  setMfaSetupCompleted(completed);
+  if (completed) {
+    localStorage.setItem('mfaSetupCompleted', 'true');
+  } else {
+    localStorage.removeItem('mfaSetupCompleted');
+  }
+};
+```
+
+### 0.1. MFA確認時のユーザー名変更セキュリティ問題 (2025年1月解決)
+
+**問題**: MFA確認画面でユーザー名フィールドが編集可能で、別ユーザーとしてMFA認証を試行できてしまうセキュリティリスク
+
+**解決**:
+```typescript
+// Login.tsxのMFA確認時はユーザー名をdisabledに変更
+<Input
+  value={username}
+  onChange={({ detail }) => setUsername(detail.value)}
+  disabled={loading || needsMFAConfirmation} // MFA確認中はdisabled
+/>
+
+// 視覚的なフィードバックも追加
+{needsMFAConfirmation && (
+  <Alert type="info" header="多要素認証が必要です">
+    {username} として認証を継続します。
+  </Alert>
+)}
+```
 
 ### 1. AWS Amplify v6 API問題
 
@@ -330,6 +389,12 @@ import type { AuthContextType } from './types/auth';
 **問題**: App.tsx と AuthContext での重複状態管理
 
 **解決**: AuthContext単一責任化、App.tsx簡素化
+
+### 5. MFA設定完了状態の永続化問題
+
+**問題**: Reactコンポーネントのライフサイクルによる状態リセット
+
+**解決**: localStorageを用いたブラウザーレベルの状態永続化
 
 ## 🔄 認証フロー詳細
 
@@ -658,6 +723,20 @@ if (pastDeadline && !mfaEnabled && !inGracePeriod) {
 // 最終的に新プール（MFA必須）へ
 await migrateToNewUserPool(userId);
 ```
+
+## 📚 技術実装詳細ドキュメント
+
+**📝 [TECHNICAL_GUIDE.md](./TECHNICAL_GUIDE.md)**
+- **対象**: 開発者・技術者
+- **内容**: 実装背景、AWS SDK使用方法、アーキテクチャ判断の詳細解説
+- **特徴**: コード例と理由を組み合わせた実装ガイド
+
+### 主要セクション
+- **localStorage永続化戦略**: 設計思想と実装背景
+- **AWS SDK v6実装パターン**: エラーハンドリング戦略
+- **React状態管理最適化**: useEffect依存配列の設計原則
+- **TypeScript型安全性**: 認証システムの型設計
+- **セキュリティ考慮事項**: TOTPシークレットの取り扱い、エラー情報の適切な抽象化
 
 ## 🚀 本番デプロイ準備
 

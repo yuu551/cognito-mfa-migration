@@ -78,12 +78,15 @@ const Login: React.FC<LoginProps> = ({ onSignIn }) => {
                 </Alert>
               )}
               
-              <FormField label="ユーザー名">
+              <FormField 
+                label="ユーザー名"
+                description={needsMFAConfirmation ? "認証中のユーザー" : undefined}
+              >
                 <Input
                   value={username}
                   onChange={({ detail }) => setUsername(detail.value)}
                   placeholder="ユーザー名を入力"
-                  disabled={loading}
+                  disabled={loading || needsMFAConfirmation}
                 />
               </FormField>
 
@@ -100,18 +103,23 @@ const Login: React.FC<LoginProps> = ({ onSignIn }) => {
               )}
 
               {needsMFAConfirmation && (
-                <FormField 
-                  label="認証コード" 
-                  description="認証アプリに表示された6桁のコードを入力してください"
-                >
-                  <Input
-                    value={totpCode}
-                    onChange={({ detail }) => setTotpCode(detail.value)}
-                    placeholder="123456"
-                    maxLength={6}
-                    disabled={loading}
-                  />
-                </FormField>
+                <>
+                  <Alert type="info" header="多要素認証が必要です">
+                    {username} として認証を続行します。認証アプリに表示されたコードを入力してください。
+                  </Alert>
+                  <FormField 
+                    label="認証コード" 
+                    description="認証アプリに表示された6桁のコードを入力してください"
+                  >
+                    <Input
+                      value={totpCode}
+                      onChange={({ detail }) => setTotpCode(detail.value)}
+                      placeholder="123456"
+                      maxLength={6}
+                      disabled={loading}
+                    />
+                  </FormField>
+                </>
               )}
 
               <Button 
