@@ -1,0 +1,152 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+
+# Production builds
+dist/
+build/
+*.local
+.output
+.vercel
+out/
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# IDE - VSCode
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# AWS CDK
+cdk.out/
+cdk.context.json
+*.js
+*.d.ts
+!jest.config.js
+!webpack.config.mjs
+!start-chromedriver.js
+!stop-chromedriver.js
+!scripts/**/*.js
+
+# TypeScript build output (src directory)
+/src/**/*.js
+/src/**/*.d.ts
+/frontend/src/**/*.js
+/frontend/src/**/*.d.ts
+
+# Keep CDK app entry points
+!cdk/bin/*.js
+
+# Claude/AI Assistant related files
+.claude/
+*.claude
+claude.json
+.claudeignore
+CLAUDE.md
+.aider*
+.cursor*
+
+# Log files
+logs/
+*.log
+
+# OS generated files
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Documentation files that are not needed
+sample.md
+
+# MCP configuration files
+.mcp.json
+mcp.json
+*.mcp.json
+
+# Package files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# Lock files (keep package-lock.json)
+yarn.lock
+pnpm-lock.yaml
+
+# AWS credentials (never commit these!)
+.aws/
+aws-exports.js
+
+# Amplify
+amplify/
+.amplify/
+amplify-backup/
+aws-exports.js
+awsconfiguration.json
+amplifyconfiguration.json
+amplify-build-config.json
+amplify-gradle-config.json
+amplifytools.xcconfig
+.secret-*
+
+# Demo artifacts - exclude entire demos directory
+demos/
+
+# Keep frontend build tool config
+!frontend/vite.config.ts
+!frontend/eslint.config.js
+
+# Keep TypeScript configs
+!tsconfig.json
+!tsconfig.*.json
