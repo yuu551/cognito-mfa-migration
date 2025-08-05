@@ -66,9 +66,9 @@ npm install
 cp .env.example .env.local
 
 # .env.localを編集（デプロイ出力値を設定）
-VITE_USER_POOL_ID=us-east-1_xxxxxxxxx
-VITE_USER_POOL_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx
-VITE_AWS_REGION=us-east-1
+VITE_COGNITO_USER_POOL_ID=us-east-1_xxxxxxxxx
+VITE_COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx
+VITE_COGNITO_REGION=us-east-1
 VITE_MFA_DEADLINE=2025-12-01  # 体験用に未来日付
 ```
 

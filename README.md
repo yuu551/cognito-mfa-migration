@@ -146,9 +146,9 @@ npm install
 cp .env.example .env.local
 
 # .env.localに以下を設定:
-VITE_USER_POOL_ID=us-east-1_xxxxxxxxx
-VITE_USER_POOL_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
-VITE_AWS_REGION=us-east-1
+VITE_COGNITO_USER_POOL_ID=us-east-1_xxxxxxxxx
+VITE_COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+VITE_COGNITO_REGION=us-east-1
 VITE_MFA_DEADLINE=2025-09-01
 ```
 
@@ -384,9 +384,9 @@ sequenceDiagram
 
 ```bash
 # 本番環境変数
-VITE_USER_POOL_ID=本番User Pool ID
-VITE_USER_POOL_CLIENT_ID=本番Client ID
-VITE_AWS_REGION=ap-northeast-1
+VITE_COGNITO_USER_POOL_ID=本番User Pool ID
+VITE_COGNITO_CLIENT_ID=本番Client ID
+VITE_COGNITO_REGION=ap-northeast-1
 VITE_MFA_DEADLINE=2025-09-01
 ```
 
