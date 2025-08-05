@@ -128,8 +128,8 @@ cdk bootstrap
 cdk deploy
 
 # デプロイ後、出力された値をメモ
-# - User Pool ID
-# - Client ID
+# - legacy User Pool ID
+# - legacy Client ID
 # - Region
 ```
 
